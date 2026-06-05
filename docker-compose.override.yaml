@@ -1,0 +1,30 @@
+# Docker Compose Override -仅用于开发环境
+# Development environment only -仅用于开发环境
+
+services:
+  llama-proxy:
+    #开发日志级别（生产环境请改为INFO）
+    environment:
+      - LOG_LEVEL=DEBUG
+
+    #重启策略：开发环境不自动重启
+    restart: "no"
+
+    #开发时挂载代码以便热重载
+    volumes:
+      - ./llama_proxy:/app
+
+  llama-cpp:
+    #开发日志级别
+    environment:
+      - LLAMA_LOG_LEVEL=DEBUG
+
+    #重启策略：开发环境不自动重启
+    restart: "no"
+
+    #挂载模型目录（请根据实际情况修改路径）
+    volumes:
+      - ./models:/models
+
+#开发提示
+# ⚠️ 此配置文件仅用于本地开发，不要部署到生产环境！

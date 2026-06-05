@@ -1,0 +1,58 @@
+services:
+  # ── CJK 空格后处理代理 ────────────────────────────────────────────────────
+  llama-proxy:
+      build:
+        context: ./llama_proxy
+        dockerfile: Dockerfile
+        args:
+          - HTTP_PROXY=http://host.docker.internal:20003   #⚡内网加速：Docker 构建时下载模型/依赖的代理（HuggingFace）
+          - HTTPS_PROXY=http://host.docker.internal:20003 #⚡内网加速：Docker 构建时下载镜像/文件的代理
+        extra_hosts:
+          - "host.docker.internal:host-gateway"   # Linux 必须加这行，允许容器访问宿主机网络
+      environment:
+        - UPSTREAM=http://llama-cpp:58080   #容器内通信：直接转发到llama.cpp（不走代理）
+        - PROXY_PORT=58080                   #代理监听端口
+        - LOG_LEVEL=DEBUG                    #日志级别：DEBUG/INFO/WARNING/ERROR
+      ports:
+        - "58080:58080"
+      depends_on:
+       - llama-cpp
+  llama-cpp:
+    restart: unless-stopped
+    image: ghcr.io/ggml-org/llama.cpp:full-cuda
+    volumes:
+      - /home/w/DEV_ENV/llama-cpp-docker-compose/models/:/models
+    environment:
+      - LLAMA_API_KEY=${LLAMA_API_KEY}
+    command: >
+      --server
+      --port 58080
+      --host 0.0.0.0
+      -ngl 99
+      -c 262144
+      -fa on
+      --cache-type-k q4_0
+      --cache-type-v q4_0
+      -np 1
+      --temp 0.7
+      --top-p 0.8
+      --top-k 20
+      --min-p 0.05
+      --spec-type draft-mtp
+      --spec-draft-n-max 2
+      --repeat-penalty 1.1
+      --repeat-last-n 64
+      --mmproj /models/Qwen3.5-9B-UD-Q4/mmproj-F16.gguf
+      -m /models/Qwen3.5-9B-UD-Q4/Qwen3.5-9B-UD-Q4_K_XL.gguf
+      --chat-template-kwargs '{"enable_thinking":false}'
+      --keep -1
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    #可选：给容器IPC 权限，有助于锁定共享内存
+    ipc: private
+    init: true   #使用tini 作为PID 1，确保信号正确传播
